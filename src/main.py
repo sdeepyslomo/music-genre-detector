@@ -44,13 +44,13 @@ print("x shape:", x.shape)
 print("y shape:", y.shape)
 
 x_train, x_test, y_train, y_test = train_test_split(
-    x,y,test_size=0.2, random_state=42
+    x,y,test_size=0.5, random_state=42
 )
 
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
-knn = KNeighborsClassifier(n_neighbors=3)
+knn = KNeighborsClassifier(n_neighbors=1)
 knn.fit(x_train,y_train)
 print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test)))
 
@@ -63,8 +63,13 @@ audio, sample_rate = librosa.load(file_path)
 mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=13)
 mfccs_mean = np.mean(mfccs,axis=1)
 mfccs_mean = mfccs_mean.reshape(1,-1)
-prediction = svc.predict(mfccs_mean)
+mfccs_std = np.std(mfccs,axis=1)
+mfccs_std = mfccs_std.reshape(1,-1)
+conc = np.concatenate((mfccs_mean,mfccs_std))
+conc = conc.reshape(1,-1)
+prediction = svc.predict(conc)
 print("Predicted genre:", prediction[0])
+
 
 
 
