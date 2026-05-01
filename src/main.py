@@ -2,6 +2,8 @@ import os
 import librosa    
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
 
 DATASET_PATH = "data"
 
@@ -44,6 +46,21 @@ x_train, x_test, y_train, y_test = train_test_split(
 
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
+
+model = KNeighborsClassifier(n_neighbors=3)
+model.fit(x_train,y_train)
+y_predict = model.predict(x_test)
+print("Accuracy:", accuracy_score(y_test, y_predict))
+
+file_path = "data/silvera.wav"
+audio, sample_rate = librosa.load(file_path)
+mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=13)
+mfccs_mean = np.mean(mfccs,axis=1)
+mfccs_mean = mfccs_mean.reshape(1,-1)
+prediction = model.predict(mfccs_mean)
+print("Predicted genre:", prediction[0])
+
+
 
 
     
