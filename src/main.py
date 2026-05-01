@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.svm import SVC
 
 DATASET_PATH = "data"
 
@@ -22,8 +23,10 @@ for genre in os.listdir(DATASET_PATH):
         try:
             audio, sample_rate = librosa.load(file_path)
             mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=13)
-            mfccs_mean = np.mean(mfccs, axis=1)
-            features.append(mfccs_mean)
+            mfccs_mean = np.mean(mfccs,axis=1)
+            mfccs_std = np.std(mfccs,axis=1)
+            conc = np.concatenate((mfccs_mean, mfccs_std))
+            features.append(conc)
             labels.append(genre)
 
             print(f"Processed: {file_path}")
@@ -47,18 +50,23 @@ x_train, x_test, y_train, y_test = train_test_split(
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
-model = KNeighborsClassifier(n_neighbors=3)
-model.fit(x_train,y_train)
-y_predict = model.predict(x_test)
-print("Accuracy:", accuracy_score(y_test, y_predict))
+knn = KNeighborsClassifier(n_neighbors=3)
+knn.fit(x_train,y_train)
+print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test)))
+
+svc = SVC()
+svc.fit(x_train,y_train)
+print("SVC Accuracy:", accuracy_score(y_test,svc.predict(x_test)))
 
 file_path = "data/silvera.wav"
 audio, sample_rate = librosa.load(file_path)
 mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=13)
 mfccs_mean = np.mean(mfccs,axis=1)
 mfccs_mean = mfccs_mean.reshape(1,-1)
-prediction = model.predict(mfccs_mean)
+prediction = svc.predict(mfccs_mean)
 print("Predicted genre:", prediction[0])
+
+
 
 
 
