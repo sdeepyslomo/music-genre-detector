@@ -1,6 +1,7 @@
 import os
-import librosa
+import librosa    
 import numpy as np
+from sklearn.model_selection import train_test_split
 
 DATASET_PATH = "data"
 
@@ -28,6 +29,21 @@ for genre in os.listdir(DATASET_PATH):
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
 
-print("Total samples:", len(features))                
+print("Total samples:", len(features))     
+
+
+x = np.array(features)
+y = np.array(labels)
+
+print("x shape:", x.shape)
+print("y shape:", y.shape)
+
+x_train, x_test, y_train, y_test = train_test_split(
+    x,y,test_size=0.2, random_state=42
+)
+
+print("Training samples:", len(x_train))
+print("Testing samples:", len(x_test))
+
 
     
