@@ -7,6 +7,9 @@ from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 import kagglehub
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import confusion_matrix
 
 DATASET_PATH = kagglehub.dataset_download("andradaolteanu/gtzan-dataset-music-genre-classification")
 print("Path to dataset files:", DATASET_PATH)
@@ -33,7 +36,7 @@ for genre in os.listdir(DATASET_PATH):
             mfccs_std = np.std(mfccs,axis=1)
             delta = librosa.feature.delta(mfccs)
             delta_mean = np.mean(delta, axis=1)
-            delta_std = np.mean(delta, axis=1)
+            delta_std = np.std(delta, axis=1)
             conc = np.concatenate((mfccs_mean, mfccs_std, delta_mean, delta_std))
             features.append(conc)
             labels.append(genre)
@@ -59,16 +62,24 @@ print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
 scaler = StandardScaler()
-x_train = scaler.fit_transform(x_train)
-x_test = scaler.transform(x_test)
+x_train_manual = scaler.fit_transform(x_train)
+x_test_manual = scaler.transform(x_test)
 
 knn = KNeighborsClassifier(n_neighbors=12)
-knn.fit(x_train,y_train)
-print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test)))
+knn.fit(x_train_manual,y_train)
+print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test_manual)))
 
-svc = SVC(kernel="rbf", C=20, gamma='scale')
-svc.fit(x_train,y_train)
-print("SVC Accuracy:", accuracy_score(y_test,svc.predict(x_test)))
+pipeline = Pipeline([('scaler',StandardScaler()),('svc',SVC())])
+
+param_grid = {
+    'svc__C': [1, 10, 100, 1000],
+    'svc__gamma': [0.1, 0.01, 0.001, 0.0001],
+    'svc__kernel': ['rbf']
+}
+
+grid = GridSearchCV(pipeline, param_grid, cv=5, verbose=2)
+grid.fit(x_train, y_train)
+print("SVC Accuracy:", accuracy_score(y_test,grid.predict(x_test)))
 
 file_path = "data/silvera.wav"
 audio, sample_rate = librosa.load(file_path)
@@ -77,13 +88,20 @@ mfccs_mean = np.mean(mfccs,axis=1)
 mfccs_std = np.std(mfccs,axis=1)
 delta = librosa.feature.delta(mfccs)
 delta_mean = np.mean(delta, axis=1)
-delta_std = np.mean(delta, axis=1)
+delta_std = np.std(delta, axis=1)
 conc = np.concatenate((mfccs_mean,mfccs_std,delta_mean,delta_std))
 conc = conc.reshape(1,-1)
-conc = scaler.transform(conc)
-prediction = svc.predict(conc)
+#for knn prediction
+conc_scaled = scaler.transform(conc)
+knn_predict = knn.predict(conc_scaled)
+#for svc prediction
+prediction = grid.best_estimator_.predict(conc)
 print("Predicted genre:", prediction[0])
+print("Best parameter:", grid.best_params_)
 
+y_pred = grid.best_estimator_.predict(x_test)
+conf_matx = confusion_matrix(y_test, y_pred)
+print(conf_matx)
 
 
 
