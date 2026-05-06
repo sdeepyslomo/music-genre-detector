@@ -37,11 +37,19 @@ for genre in os.listdir(DATASET_PATH):
             delta = librosa.feature.delta(mfccs)
             delta_mean = np.mean(delta, axis=1)
             delta_std = np.std(delta, axis=1)
-            conc = np.concatenate((mfccs_mean, mfccs_std, delta_mean, delta_std))
+            chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
+            chroma_mean = np.mean(chroma, axis=1)
+            chroma_std = np.std(chroma, axis=1)
+            conc = np.concatenate((mfccs_mean
+                                   , mfccs_std
+                                   , delta_mean
+                                   , delta_std
+                                   , chroma_mean
+                                   ,chroma_std))
             features.append(conc)
             labels.append(genre)
 
-            print(f"Processed: {file_path}")
+
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -61,6 +69,7 @@ x_train, x_test, y_train, y_test = train_test_split(
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
+#scaler for KNN
 scaler = StandardScaler()
 x_train_manual = scaler.fit_transform(x_train)
 x_test_manual = scaler.transform(x_test)
@@ -69,11 +78,12 @@ knn = KNeighborsClassifier(n_neighbors=12)
 knn.fit(x_train_manual,y_train)
 print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test_manual)))
 
+#pipeline for SVC
 pipeline = Pipeline([('scaler',StandardScaler()),('svc',SVC())])
 
 param_grid = {
-    'svc__C': [1, 10, 100, 1000],
-    'svc__gamma': [0.1, 0.01, 0.001, 0.0001],
+    'svc__C': [1, 10, 80, 100, 1000],
+    'svc__gamma': [0.1, 0.01, 0.08, 0.001, 0.0001],
     'svc__kernel': ['rbf']
 }
 
@@ -89,7 +99,15 @@ mfccs_std = np.std(mfccs,axis=1)
 delta = librosa.feature.delta(mfccs)
 delta_mean = np.mean(delta, axis=1)
 delta_std = np.std(delta, axis=1)
-conc = np.concatenate((mfccs_mean,mfccs_std,delta_mean,delta_std))
+chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
+chroma_mean = np.mean(chroma, axis=1)
+chroma_std = np.std(chroma, axis=1)
+conc = np.concatenate((mfccs_mean
+                       , mfccs_std
+                       , delta_mean
+                       , delta_std
+                       , chroma_mean
+                       ,chroma_std))
 conc = conc.reshape(1,-1)
 #for knn prediction
 conc_scaled = scaler.transform(conc)
@@ -98,6 +116,7 @@ knn_predict = knn.predict(conc_scaled)
 prediction = grid.best_estimator_.predict(conc)
 print("Predicted genre:", prediction[0])
 print("Best parameter:", grid.best_params_)
+print("Feature length:", x.shape[1])
 
 y_pred = grid.best_estimator_.predict(x_test)
 conf_matx = confusion_matrix(y_test, y_pred)
@@ -109,3 +128,4 @@ print(conf_matx)
 
 
     
+
