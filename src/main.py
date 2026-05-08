@@ -2,7 +2,6 @@ import os
 import librosa    
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.svm import SVC
 import kagglehub
@@ -10,6 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 DATASET_PATH = kagglehub.dataset_download("andradaolteanu/gtzan-dataset-music-genre-classification")
 print("Path to dataset files:", DATASET_PATH)
@@ -37,6 +38,9 @@ for genre in os.listdir(DATASET_PATH):
             delta = librosa.feature.delta(mfccs)
             delta_mean = np.mean(delta, axis=1)
             delta_std = np.std(delta, axis=1)
+            spectral_centroid = librosa.feature.spectral_centroid(y=audio,sr=sample_rate)
+            centroid_mean = np.mean(spectral_centroid)
+            centroid_std = np.std(spectral_centroid)
             chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
             chroma_mean = np.mean(chroma, axis=1)
             chroma_std = np.std(chroma, axis=1)
@@ -45,11 +49,11 @@ for genre in os.listdir(DATASET_PATH):
                                    , delta_mean
                                    , delta_std
                                    , chroma_mean
-                                   ,chroma_std))
+                                   , chroma_std
+                                   ,[centroid_mean]
+                                   ,[centroid_std]))
             features.append(conc)
             labels.append(genre)
-
-
 
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
@@ -69,16 +73,7 @@ x_train, x_test, y_train, y_test = train_test_split(
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
-#scaler for KNN
-scaler = StandardScaler()
-x_train_manual = scaler.fit_transform(x_train)
-x_test_manual = scaler.transform(x_test)
-
-knn = KNeighborsClassifier(n_neighbors=12)
-knn.fit(x_train_manual,y_train)
-print("KNN Accuracy:", accuracy_score(y_test, knn.predict(x_test_manual)))
-
-#pipeline for SVC
+#pipeline
 pipeline = Pipeline([('scaler',StandardScaler()),('svc',SVC())])
 
 param_grid = {
@@ -99,6 +94,9 @@ mfccs_std = np.std(mfccs,axis=1)
 delta = librosa.feature.delta(mfccs)
 delta_mean = np.mean(delta, axis=1)
 delta_std = np.std(delta, axis=1)
+spectral_centroid = librosa.feature.spectral_centroid(y=audio,sr=sample_rate)
+centroid_mean = np.mean(spectral_centroid)
+centroid_std = np.std(spectral_centroid)
 chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
 chroma_mean = np.mean(chroma, axis=1)
 chroma_std = np.std(chroma, axis=1)
@@ -107,12 +105,11 @@ conc = np.concatenate((mfccs_mean
                        , delta_mean
                        , delta_std
                        , chroma_mean
-                       ,chroma_std))
+                       ,chroma_std
+                       ,[centroid_mean]
+                       ,[centroid_std]))
 conc = conc.reshape(1,-1)
-#for knn prediction
-conc_scaled = scaler.transform(conc)
-knn_predict = knn.predict(conc_scaled)
-#for svc prediction
+#for prediction
 prediction = grid.best_estimator_.predict(conc)
 print("Predicted genre:", prediction[0])
 print("Best parameter:", grid.best_params_)
@@ -121,6 +118,27 @@ print("Feature length:", x.shape[1])
 y_pred = grid.best_estimator_.predict(x_test)
 conf_matx = confusion_matrix(y_test, y_pred)
 print(conf_matx)
+
+print(np.unique(y))
+
+pca = PCA(n_components=2)
+x_pca = pca.fit_transform(x)
+genres = np.unique(y)
+for genre in genres:
+    indices = y == genre
+    plt.scatter(
+        x_pca[indices, 0],
+        x_pca[indices, 1],
+        label=genre
+    )
+plt.legend()
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.title("PCA of Music Genres")
+plt.show()
+
+
+
 
 
 
