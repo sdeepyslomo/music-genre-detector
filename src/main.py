@@ -44,6 +44,15 @@ for genre in os.listdir(DATASET_PATH):
             chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
             chroma_mean = np.mean(chroma, axis=1)
             chroma_std = np.std(chroma, axis=1)
+            spectral_bandwidth = librosa.feature.spectral_bandwidth(y=audio,sr=sample_rate)
+            bandwidth_mean = np.mean(spectral_bandwidth)
+            bandwidth_std = np.std(spectral_bandwidth)
+            spectral_contrast = librosa.feature.spectral_contrast(y=audio,sr=sample_rate)
+            contrast_mean = np.mean(spectral_contrast,axis=1)
+            contrast_std = np.std(spectral_contrast,axis=1)
+            rms = librosa.feature.rms(y=audio)
+            rms_mean = np.mean(rms)
+            rms_std = np.std(rms)
             conc = np.concatenate((mfccs_mean
                                    , mfccs_std
                                    , delta_mean
@@ -51,7 +60,13 @@ for genre in os.listdir(DATASET_PATH):
                                    , chroma_mean
                                    , chroma_std
                                    ,[centroid_mean]
-                                   ,[centroid_std]))
+                                   ,[centroid_std]
+                                   ,[bandwidth_mean]
+                                   ,[bandwidth_std]
+                                   ,contrast_mean
+                                   ,contrast_std
+                                   ,[rms_mean]
+                                   ,[rms_std]))
             features.append(conc)
             labels.append(genre)
 
@@ -97,9 +112,18 @@ delta_std = np.std(delta, axis=1)
 spectral_centroid = librosa.feature.spectral_centroid(y=audio,sr=sample_rate)
 centroid_mean = np.mean(spectral_centroid)
 centroid_std = np.std(spectral_centroid)
-chroma = librosa.feature.chroma_stft(y=audio, sr= sample_rate)
+chroma = librosa.feature.chroma_stft(y=audio,sr=sample_rate)
 chroma_mean = np.mean(chroma, axis=1)
 chroma_std = np.std(chroma, axis=1)
+spectral_bandwidth = librosa.feature.spectral_bandwidth(y=audio,sr=sample_rate)
+bandwidth_mean = np.mean(spectral_bandwidth)
+bandwidth_std = np.std(spectral_bandwidth)
+spectral_contrast = librosa.feature.spectral_contrast(y=audio,sr=sample_rate)
+contrast_mean = np.mean(spectral_contrast,axis=1)
+contrast_std = np.std(spectral_contrast,axis=1)
+rms = librosa.feature.rms(y=audio)
+rms_mean = np.mean(rms)
+rms_std = np.std(rms)
 conc = np.concatenate((mfccs_mean
                        , mfccs_std
                        , delta_mean
@@ -107,7 +131,13 @@ conc = np.concatenate((mfccs_mean
                        , chroma_mean
                        ,chroma_std
                        ,[centroid_mean]
-                       ,[centroid_std]))
+                       ,[centroid_std]
+                       ,[bandwidth_mean]
+                       ,[bandwidth_std]
+                       ,contrast_mean
+                       ,contrast_std
+                       ,[rms_mean]
+                       ,[rms_std]))
 conc = conc.reshape(1,-1)
 #for prediction
 prediction = grid.best_estimator_.predict(conc)
