@@ -3,6 +3,7 @@ import librosa
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
 from sklearn.svm import SVC
 import kagglehub
 from sklearn.preprocessing import StandardScaler
@@ -11,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.feature_selection import SelectKBest, f_classif
 
 DATASET_PATH = kagglehub.dataset_download("andradaolteanu/gtzan-dataset-music-genre-classification")
 print("Path to dataset files:", DATASET_PATH)
@@ -53,6 +55,13 @@ for genre in os.listdir(DATASET_PATH):
             rms = librosa.feature.rms(y=audio)
             rms_mean = np.mean(rms)
             rms_std = np.std(rms)
+            tempo = float(librosa.feature.tempo(y=audio,sr=sample_rate)[0])
+            spectral_flatness = librosa.feature.spectral_flatness(y=audio)
+            flatness_mean = np.mean(spectral_flatness)
+            flatness_std = np.std(spectral_flatness)
+            tonnetz = librosa.feature.tonnetz(y=audio, sr=sample_rate)
+            tonnetz_mean = np.mean(tonnetz, axis=1)
+            tonnetz_std = np.std(tonnetz, axis=1)
             conc = np.concatenate((mfccs_mean
                                    , mfccs_std
                                    , delta_mean
@@ -66,7 +75,12 @@ for genre in os.listdir(DATASET_PATH):
                                    ,contrast_mean
                                    ,contrast_std
                                    ,[rms_mean]
-                                   ,[rms_std]))
+                                   ,[rms_std]
+                                   ,[tempo]
+                                   ,[flatness_mean]
+                                   ,[flatness_std]
+                                   ,tonnetz_mean
+                                   ,tonnetz_std))
             features.append(conc)
             labels.append(genre)
 
@@ -89,7 +103,9 @@ print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
 #pipeline
-pipeline = Pipeline([('scaler',StandardScaler()),('svc',SVC())])
+pipeline = Pipeline([('scaler',StandardScaler())
+                     ,('selector', SelectKBest(score_func=f_classif, k=90))
+                     ,('svc',SVC())])
 
 param_grid = {
     'svc__C': [1, 10, 80, 100, 1000],
@@ -124,6 +140,13 @@ contrast_std = np.std(spectral_contrast,axis=1)
 rms = librosa.feature.rms(y=audio)
 rms_mean = np.mean(rms)
 rms_std = np.std(rms)
+tempo = float(librosa.feature.tempo(y=audio,sr=sample_rate)[0])
+spectral_flatness = librosa.feature.spectral_flatness(y=audio)
+flatness_mean = np.mean(spectral_flatness)
+flatness_std = np.std(spectral_flatness)
+tonnetz = librosa.feature.tonnetz(y=audio, sr=sample_rate)
+tonnetz_mean = np.mean(tonnetz, axis=1)
+tonnetz_std = np.std(tonnetz, axis=1)
 conc = np.concatenate((mfccs_mean
                        , mfccs_std
                        , delta_mean
@@ -137,7 +160,12 @@ conc = np.concatenate((mfccs_mean
                        ,contrast_mean
                        ,contrast_std
                        ,[rms_mean]
-                       ,[rms_std]))
+                       ,[rms_std]
+                       ,[tempo]
+                       ,[flatness_mean]
+                       ,[flatness_std]
+                       ,tonnetz_mean
+                       ,tonnetz_std))
 conc = conc.reshape(1,-1)
 #for prediction
 prediction = grid.best_estimator_.predict(conc)
@@ -150,6 +178,8 @@ conf_matx = confusion_matrix(y_test, y_pred)
 print(conf_matx)
 
 print(np.unique(y))
+
+print(classification_report(y_test,y_pred))
 
 pca = PCA(n_components=2)
 x_pca = pca.fit_transform(x)
