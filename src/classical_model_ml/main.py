@@ -6,13 +6,17 @@ from sklearn.metrics import accuracy_score
 from sklearn.metrics import classification_report
 from sklearn.svm import SVC
 import kagglehub
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler 
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+from sklearn.preprocessing import LabelEncoder
+
 
 DATASET_PATH = kagglehub.dataset_download("andradaolteanu/gtzan-dataset-music-genre-classification")
 print("Path to dataset files:", DATASET_PATH)
@@ -93,6 +97,10 @@ print("Total samples:", len(features))
 x = np.array(features)
 y = np.array(labels)
 
+#encoder to convert ['Jazz','Metal',...] into [0,1,...]
+encoder = LabelEncoder()
+y = encoder.fit_transform(y)
+
 print("x shape:", x.shape)
 print("y shape:", y.shape)
 
@@ -102,20 +110,44 @@ x_train, x_test, y_train, y_test = train_test_split(
 print("Training samples:", len(x_train))
 print("Testing samples:", len(x_test))
 
-#pipeline
-pipeline = Pipeline([('scaler',StandardScaler())
+#pipeline and gridsearch for svc
+pipeline_svc= Pipeline([('scaler',StandardScaler())
                      ,('selector', SelectKBest(score_func=f_classif, k=90))
                      ,('svc',SVC())])
-
-param_grid = {
+param_grid_svc= {
     'svc__C': [1, 10, 80, 100, 1000],
     'svc__gamma': [0.1, 0.01, 0.08, 0.001, 0.0001],
     'svc__kernel': ['rbf']
 }
+svc_grid = GridSearchCV(pipeline_svc, param_grid_svc, cv=5, verbose=2)
+svc_grid.fit(x_train, y_train)
+print("SVC Accuracy:", accuracy_score(y_test,svc_grid.predict(x_test)))
 
-grid = GridSearchCV(pipeline, param_grid, cv=5, verbose=2)
-grid.fit(x_train, y_train)
-print("SVC Accuracy:", accuracy_score(y_test,grid.predict(x_test)))
+#pipeline and gridsearch for rf
+pipeline_rf = Pipeline([('selector', SelectKBest(score_func=f_classif,k=90))
+                       ,('rf',RandomForestClassifier())]) 
+param_grid_rf = {
+    'rf__n_estimators': [100,200],
+    'rf__max_depth': [10,20,None],
+    'rf__min_samples_split': [2,5,10],
+    'rf__min_samples_leaf': [1,2,4]
+}
+rf_grid = GridSearchCV(pipeline_rf, param_grid_rf, cv=5, verbose=2)
+rf_grid.fit(x_train,y_train)
+print("RF Accuracy:", accuracy_score(y_test, rf_grid.predict(x_test)))
+
+#pipeline and gridsearch for xgb
+pipeline_xgb = Pipeline([('selector', SelectKBest(score_func=f_classif,k=90)),('xg', XGBClassifier())])
+param_grid_xgb = {
+    'xg__n_estimators': [100,200],
+    'xg__max_depth': [3,5,7],
+    'xg__learning_rate':[0.01,0.1],
+    'xg__subsample': [0.8,1.0]
+}
+xgb_grid = GridSearchCV(pipeline_xgb,param_grid_xgb,cv=5,verbose=2)
+xgb_grid.fit(x_train,y_train)
+print("XGB Accuracy: ", accuracy_score(y_test, xgb_grid.predict(x_test)))
+
 
 file_path = "data/silvera.wav"
 audio, sample_rate = librosa.load(file_path)
@@ -167,19 +199,41 @@ conc = np.concatenate((mfccs_mean
                        ,tonnetz_mean
                        ,tonnetz_std))
 conc = conc.reshape(1,-1)
+
 #for prediction
-prediction = grid.best_estimator_.predict(conc)
-print("Predicted genre:", prediction[0])
-print("Best parameter:", grid.best_params_)
+svc_pred = svc_grid.best_estimator_.predict(conc)
+print("Predicted genre:", encoder.inverse_transform(svc_pred)[0])
+print("Best parameter:", svc_grid.best_params_)
+
+rf_pred = rf_grid.best_estimator_.predict(conc)
+print("Predicted genre:", encoder.inverse_transform(rf_pred)[0])
+print("Best parameter:", rf_grid.best_params_)
+
+xgb_pred = xgb_grid.best_estimator_.predict(conc)
+print("Predicted genre:", encoder.inverse_transform(xgb_pred)[0])
+print("Best parameter:", xgb_grid.best_params_)
+
 print("Feature length:", x.shape[1])
 
-y_pred = grid.best_estimator_.predict(x_test)
-conf_matx = confusion_matrix(y_test, y_pred)
-print(conf_matx)
+#confusion matrix & classification report of svc
+conf_matx_svc = confusion_matrix(y_test, svc_grid.best_estimator_.predict(x_test))
+print(conf_matx_svc)
+print(classification_report(y_test,svc_grid.best_estimator_.predict(x_test)))
 
-print(np.unique(y))
+#confusion matrix & classification of rf
+conf_matx_rf = confusion_matrix(y_test, rf_grid.best_estimator_.predict(x_test))
+print(conf_matx_rf)
+print(classification_report(y_test,rf_grid.best_estimator_.predict(x_test)))
 
-print(classification_report(y_test,y_pred))
+#confusion matrix and classification of xgb
+conf_matx_xgb = confusion_matrix(y_test, xgb_grid.best_estimator_.predict(x_test))
+print(conf_matx_xgb)
+print(classification_report(y_test
+                            , xgb_grid.best_estimator_.predict(x_test)
+                            ,target_names=encoder.classes_))
+
+print(encoder.classes_)
+
 
 pca = PCA(n_components=2)
 x_pca = pca.fit_transform(x)
