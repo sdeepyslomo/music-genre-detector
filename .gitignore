@@ -1,2 +1,5 @@
 data/
 *.wav
+c_ml_venv/
+dl_env/
+__pycache__/

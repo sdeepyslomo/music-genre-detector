@@ -6,6 +6,15 @@ import os
 from src.utils.a_prcs import get_dataset_path
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import (
+                  Conv2D,
+                  MaxPooling2D,
+                  Flatten,
+                  Dense,
+                  Dropout
+                )
+
 
 #function to convert .wav -> melspec
 def extract_mel_spec(file_path):
@@ -16,11 +25,11 @@ def extract_mel_spec(file_path):
     sr=sample_rate
   )
   #db scale
-  mel_spec_db = librosa.power_to_db(
+  spec = librosa.power_to_db(
     mel_spec,
     ref=np.max
   )
-  return mel_spec_db,sample_rate
+  return spec,sample_rate
 
 spectrograms=[]
 labels=[]
@@ -34,7 +43,18 @@ for genre in os.listdir(DATASET_PATH):
     file_path = os.path.join(genre_path,file)
     try:
       spec,sample_rate = extract_mel_spec(file_path)
-      spec=spec[:,:1500]
+
+      MAX_LEN = 1500
+      if spec.shape[1] < MAX_LEN:
+        pad_width = MAX_LEN - spec.shape[1]
+        spec = np.pad(
+               spec,
+               pad_width=((0,0),(0,pad_width)),
+               mode='constant'
+        )
+      else:
+        spec = spec[:, :MAX_LEN]
+
       spectrograms.append(spec)
       labels.append(genre)
     except Exception as e:
@@ -51,11 +71,36 @@ labels=encoder.fit_transform(labels)
 spectrograms=spectrograms[...,np.newaxis]
 
 #train-test-split
-x_train,x_test,t_train,y_test=train_test_split(
+x_train,x_test,y_train,y_test=train_test_split(
   spectrograms,
   labels,
   test_size=0.2,
   random_state=42
+)
+
+#The entire CNN model structure
+model = Sequential([
+    Conv2D(32,(3,3),activation='relu',input_shape=(128,1500,1)),
+    MaxPooling2D((2,2)),
+    Conv2D(64,(3,3),activation='relu'),
+    MaxPooling2D((2,2)),
+    Flatten(),
+    Dense(128,activation='relu'),
+    Dropout(0.5),
+    Dense(10,activation='softmax')
+])
+
+model.compile(
+  optimizer='adam',
+  loss='sparse_categorical_crossentropy',
+  metrics=['accuracy']
+)
+model.fit(
+  x_train,
+  y_train,
+  epochs=10,
+  batch_size=32,
+  validation_data=(x_test,y_test)
 )
 
 spec,sample_rate= extract_mel_spec("data/silvera.wav")
