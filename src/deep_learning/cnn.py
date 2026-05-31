@@ -14,7 +14,7 @@ from tensorflow.keras.layers import (
                   Dense,
                   Dropout
                 )
-
+from tensorflow.keras.callbacks import EarlyStopping
 
 #function to convert .wav -> melspec
 def extract_mel_spec(file_path):
@@ -95,14 +95,20 @@ model.compile(
   loss='sparse_categorical_crossentropy',
   metrics=['accuracy']
 )
+# Prevents overfitting by stopping training after consecutive bad validation epochs
+early_stop = EarlyStopping(
+    monitor='val_loss',
+    patience=3,
+    restore_best_weights=True
+)
 model.fit(
   x_train,
   y_train,
-  epochs=15,
-  batch_size=64,
-  validation_data=(x_test,y_test)
+  epochs=10,
+  batch_size=32,
+  validation_data=(x_test,y_test),
+  callbacks = [early_stop]
 )
-
 spec,sample_rate= extract_mel_spec("data/silvera.wav")
 print(spec.shape)
 
