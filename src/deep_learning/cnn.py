@@ -12,9 +12,16 @@ from tensorflow.keras.layers import (
                   MaxPooling2D,
                   Flatten,
                   Dense,
-                  Dropout
+                  Dropout,
+                  BatchNormalization,
+                  GlobalAveragePooling2D
                 )
 from tensorflow.keras.callbacks import EarlyStopping
+import tensorflow as tf
+
+#fix randomness
+tf.random.set_seed(42)
+np.random.seed(42)
 
 #function to convert .wav -> melspec
 def extract_mel_spec(file_path):
@@ -22,7 +29,9 @@ def extract_mel_spec(file_path):
   #waveform->freq representation
   mel_spec = librosa.feature.melspectrogram(
     y=audio,
-    sr=sample_rate
+    sr=sample_rate,
+    n_mels=128,
+    hop_length=512
   )
   #db scale
   spec = librosa.power_to_db(
@@ -70,12 +79,16 @@ labels=encoder.fit_transform(labels)
 #for adding grayscale
 spectrograms=spectrograms[...,np.newaxis]
 
+#normalize spec values
+spectrograms = (spectrograms + 80) / 80
+
 #train-test-split
 x_train,x_test,y_train,y_test=train_test_split(
   spectrograms,
   labels,
   test_size=0.2,
-  random_state=42
+  random_state=42,
+  stratify=labels
 )
 
 #The entire CNN model structure
@@ -84,28 +97,30 @@ model = Sequential([
     MaxPooling2D((2,2)),
     Conv2D(64,(3,3),activation='relu'),
     MaxPooling2D((2,2)),
-    Flatten(),
-    Dense(128,activation='relu'),
-    Dropout(0.5),
+    Conv2D(128,(3,3),activation='relu'),
+    MaxPooling2D((2,2)),
+    GlobalAveragePooling2D(),
+    Dense(256,activation='relu'),
+    Dropout(0.3),
     Dense(10,activation='softmax')
 ])
-
+#updates parameters after each batch run for better accuracies
 model.compile(
   optimizer='adam',
   loss='sparse_categorical_crossentropy',
   metrics=['accuracy']
 )
-# Prevents overfitting by stopping training after consecutive bad validation epochs
+#prevents overfitting by stopping training after consecutive bad validation epochs
 early_stop = EarlyStopping(
     monitor='val_loss',
     patience=3,
     restore_best_weights=True
 )
-model.fit(
+history=model.fit(
   x_train,
   y_train,
-  epochs=10,
-  batch_size=32,
+  epochs=30,
+  batch_size=16,
   validation_data=(x_test,y_test),
   callbacks = [early_stop]
 )
@@ -119,9 +134,22 @@ librosa.display.specshow(
   x_axis ='time',
   y_axis='mel'
 )
+
+history.history['accuracy']
+history.history['val_accuracy']
+history.history['loss']
+history.history['val_loss']
+
 plt.colorbar(format='%+2.0f dB')
 plt.title("Mel Spectrogram")
 plt.show()
+plt.plot(history.history['accuracy'], label='Train Acc')
+plt.plot(history.history['val_accuracy'], label='Val Acc')
+plt.legend()
+plt.show()
+
+
+
 
 
 
